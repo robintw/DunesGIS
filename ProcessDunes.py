@@ -4,24 +4,32 @@
 import arcgisscripting
 import os
 
-def CalculateLength(PolylineFeatures):
-    print "Adding field"
+def CalculateFields(PolylineFeatures):
     gp.AddField(PolylineFeatures, "Length", "double")
+    gp.AddField(PolylineFeatures, "CentroidX", "double")
+    gp.AddField(PolylineFeatures, "CentroidY", "double")
 
-    print "Getting descriptions"
     desc = gp.Describe(PolylineFeatures)
     shapeField = desc.ShapeFieldName
 
-    print "Getting cursor"
     rows = gp.UpdateCursor(PolylineFeatures)
     row = rows.Next()
-    gp.AddMessage("  Calculating values" + "\n")
 
     while row:
         # Create the geometry object
         feat = row.GetValue(shapeField)
-        # Calculate the appropriate statistic
+        
+        # Set the length field
         row.SetValue("Length",feat.length)
+
+        # Get the centroid co-ords and split them
+        centroid_str = feat.Centroid
+        centroid_arr = centroid_str.rsplit(" ")
+
+        # Assign the centroid co-ords to the right fields
+        row.SetValue("CentroidX", centroid_arr[0])
+        row.SetValue("CentroidY", centroid_arr[1])
+        
         rows.UpdateRow(row)
         row = rows.Next()
     del rows
@@ -78,6 +86,28 @@ def Count(inputData, FieldName):
     row = rows.Next()
     return row.GetValue(fld.Name)
 
+def PolylineToPoint(InputPolylines, OutputPoints, Folder):
+    gp.CreateFeatureClass_management(Folder, OutputPoints, "POINT")
+
+    rows = gp.SearchCursor(InputPolylines)
+    row = rows.Next()
+
+    while row:
+        cur = gp.InsertCursor(OutputPoints)
+        new_row = cur.NewRow()
+        
+        point = gp.CreateObject("Point")
+        point.x = row.GetValue("CentroidX")
+        point.y = row.GetValue("CentroidY")
+        
+        new_row.shape = point
+        cur.InsertRow(new_row)
+        del new_row
+        row = rows.Next()
+    del rows
+    del row
+    return
+
 # ----------------------------------------------------------------
 # Main Script Starts Here...
 # ----------------------------------------------------------------
@@ -86,13 +116,15 @@ def Count(inputData, FieldName):
 InRaster = "C:\Documents and Settings\Robin Wilson\My Documents\_Academic\GISTest\TestOutput2.tif"
 PolylineFilename = "DunesExportTest.shp"
 SubsetFilename = "Subset.shp"
+PointsFilename = "Points.shp"
 
 # Create the Geoprocessor object
 gp = arcgisscripting.create()
 
+# Set to overwrite output
 gp.OverWriteOutput = 1
 
-gp.workspace = "C:\TestArcWorkspace"
+gp.workspace = "C:\TestArc"
 
 print "Finished initialising"
 
@@ -102,8 +134,8 @@ print "Converting Raster -> Polyline"
 # Process: RasterToPolyline_conversion
 gp.RasterToPolyline_conversion(InRaster, PolylineFilename, "ZERO", 0, "SIMPLIFY", "Value")
 
-print "Calculating length"
-CalculateLength(PolylineFilename)
+print "Calculating fields"
+CalculateFields(PolylineFilename)
 
 # Make a feature layer from the polylines
 gp.MakeFeatureLayer(PolylineFilename,"Polyline_lyr")
@@ -112,14 +144,19 @@ print "Subsetting by length"
 gp.SelectLayerByAttribute("Polyline_lyr", "NEW_SELECTION", " \"Length\" > 15 ")
 gp.CopyFeatures("Polyline_lyr", SubsetFilename)
 
+print "Converting to points"
+PolylineToPoint(SubsetFilename, PointsFilename, gp.workspace)
+
+print "Calculating Nearest Neighbour"
+# Do Nearest Neighbour calculation
+nn_output = gp.AverageNearestNeighbor_stats(PointsFilename, "Euclidean Distance", "false", "#")
+
+print "-------- Statistics -------"
+print "Number of dunes: ", Count(SubsetFilename, "Length")
 print "Mean Length: ", Mean(SubsetFilename, "Length")
 print "Total Length: ", Sum(SubsetFilename, "Length")
-print "Number of dunes: ", Count(SubsetFilename, "Length")
-
-
-# Do Nearest Neighbour calculation
-nn_output = gp.AverageNearestNeighbor_stats(SubsetFilename, "Euclidean Distance", "false", "#")
-print nn_output
-
-
-
+# Split up results and print
+nn_array = nn_output.rsplit(";")
+print "R-score: ", nn_array[0]
+print "Z-score: ", nn_array[1]
+print "p-value: ", nn_array[2]
