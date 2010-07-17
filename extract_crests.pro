@@ -29,6 +29,7 @@ PRO EXTRACT_CRESTS_AUTOMATED, input_file
   pos = [0]
   
   EXTRACT_CRESTS, r_fid, dims, pos, output_file
+  print, "Extracted crests to ", output_file
 END
 
 PRO EXTRACT_CRESTS_GUI
@@ -127,6 +128,8 @@ PRO EXTRACT_CRESTS, fid, dims, pos, output_file
   
   ; Fill in the gaps if needed
   filled_output = FILL_IN_GAPS(output)
+  
+  ENVI_ENTER_DATA, filled_output, r_fid=output_fid
  
   ; Output to TIFF
   ENVI_FILE_QUERY, output_fid, dims=dims
@@ -137,7 +140,8 @@ PRO EXTRACT_CRESTS, fid, dims, pos, output_file
   ENVI_FILE_MNG, id=aspect_fid, /REMOVE, /DELETE
   ENVI_FILE_MNG, id=LP1_fid, /REMOVE, /DELETE
   ENVI_FILE_MNG, id=LP2_fid, /REMOVE, /DELETE
-  
+  ENVI_FILE_MNG, id=output_fid, /REMOVE, /DELETE 
+  ENVI_FILE_MNG, id=fid, /REMOVE
   
   
 END
@@ -180,52 +184,18 @@ FUNCTION FILL_IN_GAPS, output
     sum = *A + *B + *C + *D + *E + *F + *G + *H + *I
     
     indices = WHERE(output EQ 0 AND *pairs[0, loop_var] EQ 1 AND *pairs[1, loop_var] EQ 1 AND sum EQ 2, count)
-    print, "Filling in indices: ", indices
     if count GT 0 THEN BEGIN
       output[indices] = 1
-      print, "Array indices: ", ARRAY_INDICES(output, indices[0])
-      help, indices
-      print, "Setting it to 1"
     ENDIF
   ENDFOR
-
-
-  
-;  output = FILL_IN_GAP(A, H, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  output = FILL_IN_GAP(A, I, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  sum_before = sum
-;  output = FILL_IN_GAP(A, F, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  sum_after = sum
-;  print, sum_after - sum_before
-;  output = FILL_IN_GAP(D, F, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  ;output = FILL_IN_GAP(D, I, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  output = FILL_IN_GAP(G, B, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  output = FILL_IN_GAP(G, C, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  
-;  output = FILL_IN_GAP(D, F, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  output = FILL_IN_GAP(G, F, sum, output)
-;  sum = A + B + C + D + E + F + G + H + I
-;  output = FILL_IN_GAP(D, C, sum, output)
   
   return, output
 END
 
 FUNCTION FILL_IN_GAP, start, finish, sum, output
   indices = WHERE(output EQ 0 AND start EQ 1 AND finish EQ 1 AND sum EQ 2, count)
-  print, "Filling in indices: ", indices
   if count GT 0 THEN BEGIN
     output[indices] = 1
-    print, "Array indices: ", ARRAY_INDICES(output, indices[0])
-    help, indices
-    print, "Setting it to 1"
   ENDIF
   
   return, output

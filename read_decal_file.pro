@@ -1,3 +1,5 @@
+; Reads the DECAL output file given in input_file and creates
+; an ENVI .bsq file (output_file), with the r_fid being the fid of that ENVI file
 PRO READ_DECAL_FILE, input_file, output_file, r_fid
   ;file = "C:\Documents and Settings\Robin Wilson\My Documents\_Academic\GISTest\IDL\_Dunes\sand05.txt"
   

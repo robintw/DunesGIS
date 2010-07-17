@@ -1,3 +1,5 @@
+; THIS FILE IS NO LONGER USED, BUT MAY BE USEFUL IN FUTURE
+; 
 ; Idea: Keep track of which cell you've come to a cell from, and then don't let you go back there unles there are no other possibilities
 ; Kinda done the idea above
 ; Somehow last_cell = current_cell == 33....how on earth?!
