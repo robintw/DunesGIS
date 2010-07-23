@@ -109,22 +109,6 @@ def PolylineToPoint(InputPolylines, OutputPoints, Folder):
     del row
     return
 
-# ----------------------------------------------------------------
-# Main Script Starts Here...
-# ----------------------------------------------------------------
-
-# Recursively walk though the directory tree
-for root, dirs, files in os.walk('D:\Users\Robin Wilson\Documents\University\PhD'):
-    # For each file found
-    for name in files:
-        # Get the full file path
-        full_path = os.path.join(root, name)
-        # If it's a .tif file then print the full file path
-        if os.path.splitext(full_path)[1] == ".tif":
-            print full_path
-            #process_file(full_path)
-
-
 def process_file(full_path):
     full_path_no_ext = os.path.splitext(full_path)[0]
     
@@ -176,3 +160,18 @@ def process_file(full_path):
     print "R-score: ", nn_array[0]
     print "Z-score: ", nn_array[1]
     print "p-value: ", nn_array[2]
+
+# ----------------------------------------------------------------
+# Main Script Starts Here...
+# ----------------------------------------------------------------
+
+# Recursively walk though the directory tree
+for root, dirs, files in os.walk('D:\Users\Robin Wilson\Documents\University\PhD'):
+    # For each file found
+    for name in files:
+        # Get the full file path
+        full_path = os.path.join(root, name)
+        # If it's a .tif file then print the full file path
+        if os.path.splitext(full_path)[1] == ".tif":
+            print full_path
+            #process_file(full_path)
