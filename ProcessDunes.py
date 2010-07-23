@@ -3,6 +3,7 @@
 # output files using IDL
 import arcgisscripting
 import os
+from os.path import join, getsize
 
 def CalculateFields(PolylineFeatures):
     gp.AddField(PolylineFeatures, "Length", "double")
@@ -112,51 +113,66 @@ def PolylineToPoint(InputPolylines, OutputPoints, Folder):
 # Main Script Starts Here...
 # ----------------------------------------------------------------
 
-# Set input details
-InRaster = "C:\Documents and Settings\Robin Wilson\My Documents\_Academic\GISTest\TestOutput2.tif"
-PolylineFilename = "DunesExportTest.shp"
-SubsetFilename = "Subset.shp"
-PointsFilename = "Points.shp"
-
-# Create the Geoprocessor object
-gp = arcgisscripting.create()
-
-# Set to overwrite output
-gp.OverWriteOutput = 1
-
-gp.workspace = "C:\TestArc"
-
-print "Finished initialising"
+# Recursively walk though the directory tree
+for root, dirs, files in os.walk('D:\Users\Robin Wilson\Documents\University\PhD'):
+    # For each file found
+    for name in files:
+        # Get the full file path
+        full_path = os.path.join(root, name)
+        # If it's a .tif file then print the full file path
+        if os.path.splitext(full_path)[1] == ".tif":
+            print full_path
+            #process_file(full_path)
 
 
-print "Converting Raster -> Polyline"
+def process_file(full_path):
+    full_path_no_ext = os.path.splitext(full_path)[0]
+    
+    # Set input details
+    InRaster = full_path
+    PolylineFilename = full_path_no_ext + "_lines.shp"
+    SubsetFilename = full_path_no_ext + "_lines_sub.shp"
+    PointsFilename = full_path_no_ext + "_pts-c.shp"
 
-# Process: RasterToPolyline_conversion
-gp.RasterToPolyline_conversion(InRaster, PolylineFilename, "ZERO", 0, "SIMPLIFY", "Value")
+    # Create the Geoprocessor object
+    gp = arcgisscripting.create()
 
-print "Calculating fields"
-CalculateFields(PolylineFilename)
+    # Set to overwrite output
+    gp.OverWriteOutput = 1
 
-# Make a feature layer from the polylines
-gp.MakeFeatureLayer(PolylineFilename,"Polyline_lyr")
+    gp.workspace = "C:\TestArc"
 
-print "Subsetting by length"
-gp.SelectLayerByAttribute("Polyline_lyr", "NEW_SELECTION", " \"Length\" > 15 ")
-gp.CopyFeatures("Polyline_lyr", SubsetFilename)
+    print "Finished initialising"
 
-print "Converting to points"
-PolylineToPoint(SubsetFilename, PointsFilename, gp.workspace)
 
-print "Calculating Nearest Neighbour"
-# Do Nearest Neighbour calculation
-nn_output = gp.AverageNearestNeighbor_stats(PointsFilename, "Euclidean Distance", "false", "#")
+    print "Converting Raster -> Polyline"
 
-print "-------- Statistics -------"
-print "Number of dunes: ", Count(SubsetFilename, "Length")
-print "Mean Length: ", Mean(SubsetFilename, "Length")
-print "Total Length: ", Sum(SubsetFilename, "Length")
-# Split up results and print
-nn_array = nn_output.rsplit(";")
-print "R-score: ", nn_array[0]
-print "Z-score: ", nn_array[1]
-print "p-value: ", nn_array[2]
+    # Process: RasterToPolyline_conversion
+    gp.RasterToPolyline_conversion(InRaster, PolylineFilename, "ZERO", 0, "SIMPLIFY", "Value")
+
+    print "Calculating fields"
+    CalculateFields(PolylineFilename)
+
+    # Make a feature layer from the polylines
+    gp.MakeFeatureLayer(PolylineFilename,"Polyline_lyr")
+
+    print "Subsetting by length"
+    gp.SelectLayerByAttribute("Polyline_lyr", "NEW_SELECTION", " \"Length\" > 15 ")
+    gp.CopyFeatures("Polyline_lyr", SubsetFilename)
+
+    print "Converting to points"
+    PolylineToPoint(SubsetFilename, PointsFilename, gp.workspace)
+
+    print "Calculating Nearest Neighbour"
+    # Do Nearest Neighbour calculation
+    nn_output = gp.AverageNearestNeighbor_stats(PointsFilename, "Euclidean Distance", "false", "#")
+
+    print "-------- Statistics -------"
+    print "Number of dunes: ", Count(SubsetFilename, "Length")
+    print "Mean Length: ", Mean(SubsetFilename, "Length")
+    print "Total Length: ", Sum(SubsetFilename, "Length")
+    # Split up results and print
+    nn_array = nn_output.rsplit(";")
+    print "R-score: ", nn_array[0]
+    print "Z-score: ", nn_array[1]
+    print "p-value: ", nn_array[2]
