@@ -155,6 +155,8 @@ def process_file(full_path):
     mean_len = Mean(SubsetFilename, "Length")
     total_len = Sum(SubsetFilename, "Length")
 
+    defect_dens = n_dunes / total_len
+
     # Get out the individual parts of the Nearest Neighbour output
     nn_array = nn_output.rsplit(";")
     r_score = nn_array[0]
@@ -169,6 +171,7 @@ def process_file(full_path):
     csv_array.append(str(n_dunes))
     csv_array.append(str(mean_len))
     csv_array.append(str(total_len))
+    csv_array.append(str(defect_dens))
     csv_array.append(str(r_score))
     csv_array.append(str(z_score))
     csv_array.append(str(p_value))
@@ -193,8 +196,10 @@ gp = arcgisscripting.create()
 
 print "Initialised ArcGIS object"
 
-FILE = open(folder + "\\" + "results.csv", "a")
-FILE.write("name,n,mean_len,total_len,r_score,z_score,p_value\n")
+output_file = os.path.join(folder, "results.csv")
+
+FILE = open(output_file, "a")
+FILE.write("name,n,mean_len,total_len,defect_dens,r_score,z_score,p_value\n")
 
 # Recursively walk though the directory tree
 for root, dirs, files in os.walk(folder):
