@@ -5,7 +5,10 @@ import arcgisscripting
 import sys
 import re
 import os
-from os.path import join, getsize
+
+import time
+
+MINIMUM_POLYLINE_LENGTH = 15
 
 def CalculateFields(PolylineFeatures):
     gp.AddField(PolylineFeatures, "Length", "double")
@@ -38,58 +41,36 @@ def CalculateFields(PolylineFeatures):
     del rows
     return
 
-def Mean(inputData, FieldName):
-    # Execute the Summary Statistics tool using the MEAN option
-    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " MEAN")
+def CalculateStatistics(inputData, FieldName):
+    # Execute the Summary Statistics tool using the MEAN, SUM and COUNT options
+    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " MEAN;" + FieldName + " SUM;" + FieldName + " COUNT;")
     # Get a list of fields from the new in-memory table.
     flds = gp.ListFields("mean_tmp")
     # Retrieve the field with the mean value.
     fld = flds.Next()
     while fld:
         if fld.Name.__contains__("MEAN_"):
-            break
+            # Open a Search Cursor using field name.
+            rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
+            #Get the first row and mean value.
+            row = rows.Next()
+            mean = row.GetValue(fld.Name)
+        elif fld.Name.__contains__("SUM_"):
+            # Open a Search Cursor using field name.
+            rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
+            #Get the first row and mean value.
+            row = rows.Next()
+            total = row.GetValue(fld.Name)
+        elif fld.Name.__contains__("COUNT_"):
+            # Open a Search Cursor using field name.
+            rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
+            #Get the first row and mean value.
+            row = rows.Next()
+            count = row.GetValue(fld.Name)
         fld = flds.Next()
-    # Open a Search Cursor using field name.
-    rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
-    #Get the first row and mean value.
-    row = rows.Next()
-    return row.GetValue(fld.Name)
+    return [count, mean, total]
 
-def Sum(inputData, FieldName):
-    # Execute the Summary Statistics tool using the MEAN option
-    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " SUM")
-    # Get a list of fields from the new in-memory table.
-    flds = gp.ListFields("mean_tmp")
-    # Retrieve the field with the mean value.
-    fld = flds.Next()
-    while fld:
-        if fld.Name.__contains__("SUM_"):
-            break
-        fld = flds.Next()
-    # Open a Search Cursor using field name.
-    rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
-    #Get the first row and mean value.
-    row = rows.Next()
-    return row.GetValue(fld.Name)
-
-def Count(inputData, FieldName):
-    # Execute the Summary Statistics tool using the MEAN option
-    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " COUNT")
-    # Get a list of fields from the new in-memory table.
-    flds = gp.ListFields("mean_tmp")
-    # Retrieve the field with the mean value.
-    fld = flds.Next()
-    while fld:
-        if fld.Name.__contains__("COUNT_"):
-            break
-        fld = flds.Next()
-    # Open a Search Cursor using field name.
-    rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
-    #Get the first row and mean value.
-    row = rows.Next()
-    return row.GetValue(fld.Name)
-
-def PolylineToPoint(InputPolylines, OutputPoints, Folder):
+def PolylineToPoint_Centre(InputPolylines, OutputPoints, Folder):
     OutputPoints = os.path.split(OutputPoints)[1]
 
     gp.CreateFeatureClass_management(Folder, OutputPoints, "POINT")
@@ -114,6 +95,7 @@ def PolylineToPoint(InputPolylines, OutputPoints, Folder):
     return
 
 def process_file(full_path):
+    
     full_path_no_ext = os.path.splitext(full_path)[0]
     
     # Set input details
@@ -139,11 +121,11 @@ def process_file(full_path):
     gp.MakeFeatureLayer(PolylineFilename,"Polyline_lyr")
 
     print "Subsetting by length"
-    gp.SelectLayerByAttribute("Polyline_lyr", "NEW_SELECTION", " \"Length\" > 15 ")
+    gp.SelectLayerByAttribute("Polyline_lyr", "NEW_SELECTION", " \"Length\" > " + str(MINIMUM_POLYLINE_LENGTH))
     gp.CopyFeatures("Polyline_lyr", SubsetFilename)
 
     print "Converting to points"
-    PolylineToPoint(SubsetFilename, PointsFilename, gp.workspace)
+    PolylineToPoint_Centre(SubsetFilename, PointsFilename, gp.workspace)
 
     print "Calculating Nearest Neighbour"
     
@@ -151,9 +133,11 @@ def process_file(full_path):
     nn_output = gp.AverageNearestNeighbor_stats(PointsFilename, "Euclidean Distance", "false", "#")
 
     # Get stats on the dune lengths and numbers
-    n_dunes = Count(SubsetFilename, "Length")
-    mean_len = Mean(SubsetFilename, "Length")
-    total_len = Sum(SubsetFilename, "Length")
+    stats = CalculateStatistics(SubsetFilename, "Length")
+
+    n_dunes = stats[0]
+    mean_len = stats[1]
+    total_len = stats[2]
 
     defect_dens = n_dunes / total_len
 
@@ -186,10 +170,12 @@ def process_file(full_path):
 #folder = 'D:\GIS\RealOutputs'
 
 # Get the folder from the first command-line argument
-folder = sys.argv[1]
-#folder = "D:\GIS\ConstantIterations"
+#folder = sys.argv[1]
+folder = "D:\GIS\ConstantIterations"
 
 print "Started Dune Processing"
+
+start = time.clock()
 
 # Create the Geoprocessor object
 gp = arcgisscripting.create()
@@ -216,5 +202,8 @@ for root, dirs, files in os.walk(folder):
             FILE.write(csv_line + "\n")
 
 FILE.close()
-            
-            
+
+end = time.clock()
+
+print "-------------"
+print "Analsis took " + str(end-start) + " seconds"
