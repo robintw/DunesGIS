@@ -3,6 +3,7 @@
 # output files using IDL
 import arcgisscripting
 import sys
+import re
 import os
 from os.path import join, getsize
 
@@ -120,7 +121,7 @@ def process_file(full_path):
     PolylineFilename = full_path_no_ext + "_lines.shp"
     SubsetFilename = full_path_no_ext + "_lines_sub.shp"
     PointsFilename = full_path_no_ext + "_pts_c.shp"
-
+    
     # Set to overwrite output
     gp.OverWriteOutput = 1
 
@@ -149,27 +150,22 @@ def process_file(full_path):
     # Do Nearest Neighbour calculation
     nn_output = gp.AverageNearestNeighbor_stats(PointsFilename, "Euclidean Distance", "false", "#")
 
+    # Get stats on the dune lengths and numbers
     n_dunes = Count(SubsetFilename, "Length")
     mean_len = Mean(SubsetFilename, "Length")
     total_len = Sum(SubsetFilename, "Length")
 
-    #print "-------- Statistics -------"
-    #print "Number of dunes: ", n_dunes
-    #print "Mean Length: ", mean_len
-    #print "Total Length: ", total_len
-    # Split up results and print
+    # Get out the individual parts of the Nearest Neighbour output
     nn_array = nn_output.rsplit(";")
-
     r_score = nn_array[0]
     z_score = nn_array[1]
     p_value = nn_array[2]
-    
-    #print "R-score: ", r_score
-    #print "Z-score: ", z_score
-    #print "p-value: ", p_value
 
+    # Create the CSV line ready to be appended
     csv_array = []
-    csv_array.append(os.path.split(full_path_no_ext)[1])
+    tidied_file_name = re.sub("_extract", "", os.path.split(full_path_no_ext)[1])
+    
+    csv_array.append(tidied_file_name)
     csv_array.append(str(n_dunes))
     csv_array.append(str(mean_len))
     csv_array.append(str(total_len))
@@ -186,10 +182,16 @@ def process_file(full_path):
 
 #folder = 'D:\GIS\RealOutputs'
 
+# Get the folder from the first command-line argument
 folder = sys.argv[1]
+#folder = "D:\GIS\ConstantIterations"
+
+print "Started Dune Processing"
 
 # Create the Geoprocessor object
 gp = arcgisscripting.create()
+
+print "Initialised ArcGIS object"
 
 FILE = open(folder + "\\" + "results.csv", "a")
 FILE.write("name,n,mean_len,total_len,r_score,z_score,p_value\n")

@@ -15,8 +15,10 @@ FUNCTION REMOVE_LOW_VALUES, fid, dims, pos, threshold
   return, WholeBand
 END
 
-PRO EXTRACT_CRESTS_FROM_FOLDER, folder
-  filenames = FILE_SEARCH(folder, "*sand05.txt")
+PRO EXTRACT_CRESTS_FROM_FOLDER, folder, pattern
+  ;"*sand05.txt"
+
+  filenames = FILE_SEARCH(folder, pattern)
   
   print, filenames
   
