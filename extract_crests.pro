@@ -15,6 +15,17 @@ FUNCTION REMOVE_LOW_VALUES, fid, dims, pos, threshold
   return, WholeBand
 END
 
+PRO EXTRACT_CRESTS_FROM_FOLDER, folder
+  filenames = FILE_SEARCH(folder, "*sand05.txt")
+  
+  print, filenames
+  
+  FOR i = 0, N_ELEMENTS(filenames)-1 DO BEGIN
+    EXTRACT_CRESTS_AUTOMATED, filenames[i]
+  ENDFOR
+END
+
+
 PRO EXTRACT_CRESTS_AUTOMATED, input_file
   input_file_base = STRMID(input_file, 0, STRLEN(input_file) - 4)
 

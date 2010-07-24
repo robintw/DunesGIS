@@ -2,6 +2,7 @@
 # to process dune crests created through processing DECAL
 # output files using IDL
 import arcgisscripting
+import sys
 import os
 from os.path import join, getsize
 
@@ -88,6 +89,8 @@ def Count(inputData, FieldName):
     return row.GetValue(fld.Name)
 
 def PolylineToPoint(InputPolylines, OutputPoints, Folder):
+    OutputPoints = os.path.split(OutputPoints)[1]
+
     gp.CreateFeatureClass_management(Folder, OutputPoints, "POINT")
 
     rows = gp.SearchCursor(InputPolylines)
@@ -116,18 +119,12 @@ def process_file(full_path):
     InRaster = full_path
     PolylineFilename = full_path_no_ext + "_lines.shp"
     SubsetFilename = full_path_no_ext + "_lines_sub.shp"
-    PointsFilename = full_path_no_ext + "_pts-c.shp"
-
-    # Create the Geoprocessor object
-    gp = arcgisscripting.create()
+    PointsFilename = full_path_no_ext + "_pts_c.shp"
 
     # Set to overwrite output
     gp.OverWriteOutput = 1
 
-    gp.workspace = "C:\TestArc"
-
-    print "Finished initialising"
-
+    gp.workspace = os.path.split(full_path)[0]
 
     print "Converting Raster -> Polyline"
 
@@ -148,30 +145,69 @@ def process_file(full_path):
     PolylineToPoint(SubsetFilename, PointsFilename, gp.workspace)
 
     print "Calculating Nearest Neighbour"
+    
     # Do Nearest Neighbour calculation
     nn_output = gp.AverageNearestNeighbor_stats(PointsFilename, "Euclidean Distance", "false", "#")
 
-    print "-------- Statistics -------"
-    print "Number of dunes: ", Count(SubsetFilename, "Length")
-    print "Mean Length: ", Mean(SubsetFilename, "Length")
-    print "Total Length: ", Sum(SubsetFilename, "Length")
+    n_dunes = Count(SubsetFilename, "Length")
+    mean_len = Mean(SubsetFilename, "Length")
+    total_len = Sum(SubsetFilename, "Length")
+
+    #print "-------- Statistics -------"
+    #print "Number of dunes: ", n_dunes
+    #print "Mean Length: ", mean_len
+    #print "Total Length: ", total_len
     # Split up results and print
     nn_array = nn_output.rsplit(";")
-    print "R-score: ", nn_array[0]
-    print "Z-score: ", nn_array[1]
-    print "p-value: ", nn_array[2]
+
+    r_score = nn_array[0]
+    z_score = nn_array[1]
+    p_value = nn_array[2]
+    
+    #print "R-score: ", r_score
+    #print "Z-score: ", z_score
+    #print "p-value: ", p_value
+
+    csv_array = []
+    csv_array.append(os.path.split(full_path_no_ext)[1])
+    csv_array.append(str(n_dunes))
+    csv_array.append(str(mean_len))
+    csv_array.append(str(total_len))
+    csv_array.append(str(r_score))
+    csv_array.append(str(z_score))
+    csv_array.append(str(p_value))
+
+    csv_string = ",".join(csv_array)
+    return csv_string
 
 # ----------------------------------------------------------------
 # Main Script Starts Here...
 # ----------------------------------------------------------------
 
+#folder = 'D:\GIS\RealOutputs'
+
+folder = sys.argv[1]
+
+# Create the Geoprocessor object
+gp = arcgisscripting.create()
+
+FILE = open(folder + "\\" + "results.csv", "a")
+FILE.write("name,n,mean_len,total_len,r_score,z_score,p_value\n")
+
 # Recursively walk though the directory tree
-for root, dirs, files in os.walk('D:\Users\Robin Wilson\Documents\University\PhD'):
+for root, dirs, files in os.walk(folder):
     # For each file found
     for name in files:
         # Get the full file path
         full_path = os.path.join(root, name)
         # If it's a .tif file then print the full file path
         if os.path.splitext(full_path)[1] == ".tif":
-            print full_path
-            #process_file(full_path)
+            print "----------------"
+            print "Processing " + full_path
+            csv_line = process_file(full_path)
+            print csv_line
+            FILE.write(csv_line + "\n")
+
+FILE.close()
+            
+            
