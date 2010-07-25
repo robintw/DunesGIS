@@ -43,7 +43,7 @@ def CalculateFields(PolylineFeatures):
 
 def CalculateStatistics(inputData, FieldName):
     # Execute the Summary Statistics tool using the MEAN, SUM and COUNT options
-    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " MEAN;" + FieldName + " SUM;" + FieldName + " COUNT;")
+    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " MEAN;" + FieldName + " SUM;" + FieldName + " COUNT;" + FieldName + " MIN;" + FieldName + " MAX;")
     # Get a list of fields from the new in-memory table.
     flds = gp.ListFields("mean_tmp")
     # Retrieve the field with the mean value.
@@ -67,8 +67,20 @@ def CalculateStatistics(inputData, FieldName):
             #Get the first row and mean value.
             row = rows.Next()
             count = row.GetValue(fld.Name)
+        elif fld.Name.__contains__("MAX_"):
+            # Open a Search Cursor using field name.
+            rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
+            #Get the first row and mean value.
+            row = rows.Next()
+            maximum = row.GetValue(fld.Name)
+        elif fld.Name.__contains__("MIN_"):
+            # Open a Search Cursor using field name.
+            rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
+            #Get the first row and mean value.
+            row = rows.Next()
+            minimum = row.GetValue(fld.Name)
         fld = flds.Next()
-    return [count, mean, total]
+    return [count, mean, total, maximum, minimum]
 
 def PolylineToPoint_Centre(InputPolylines, OutputPoints, Folder):
     OutputPoints = os.path.split(OutputPoints)[1]
@@ -138,6 +150,8 @@ def process_file(full_path):
     n_dunes = stats[0]
     mean_len = stats[1]
     total_len = stats[2]
+    max_len = stats[3]
+    min_len = stats[4]
 
     defect_dens = n_dunes / total_len
 
@@ -150,15 +164,22 @@ def process_file(full_path):
     # Create the CSV line ready to be appended
     csv_array = []
     tidied_file_name = re.sub("_extract", "", os.path.split(full_path_no_ext)[1])
+
+    output_stats = [tidied_file_name, n_dunes, mean_len, total_len, max_len, min_len, defect_dens, r_score, z_score, p_value]
+
+    for item in output_stats:
+        csv_array.append(str(item))
     
-    csv_array.append(tidied_file_name)
-    csv_array.append(str(n_dunes))
-    csv_array.append(str(mean_len))
-    csv_array.append(str(total_len))
-    csv_array.append(str(defect_dens))
-    csv_array.append(str(r_score))
-    csv_array.append(str(z_score))
-    csv_array.append(str(p_value))
+    #csv_array.append(tidied_file_name)
+    #csv_array.append(str(n_dunes))
+    #csv_array.append(str(mean_len))
+    #csv_array.append(str(total_len))
+    #csv_array.append(str(max_len))
+    #csv_array.append(str(min_len))
+    #csv_array.append(str(defect_dens))
+    #csv_array.append(str(r_score))
+    #csv_array.append(str(z_score))
+    #csv_array.append(str(p_value))
 
     csv_string = ",".join(csv_array)
     return csv_string
@@ -185,7 +206,7 @@ print "Initialised ArcGIS object"
 output_file = os.path.join(folder, "results.csv")
 
 FILE = open(output_file, "a")
-FILE.write("name,n,mean_len,total_len,defect_dens,r_score,z_score,p_value\n")
+FILE.write("name,n,mean_len,total_len,max_len,min_len,defect_dens,r_score,z_score,p_value\n")
 
 # Recursively walk though the directory tree
 for root, dirs, files in os.walk(folder):
