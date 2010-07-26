@@ -5,8 +5,11 @@ import arcgisscripting
 import sys
 import re
 import os
-
+import math
 import time
+import numpy
+import inspect
+import pdb
 
 MINIMUM_POLYLINE_LENGTH = 15
 
@@ -106,6 +109,154 @@ def PolylineToPoint_Centre(InputPolylines, OutputPoints, Folder):
     del row
     return
 
+def rotate(x, y, deg):
+    rad = math.radians(deg)
+    s, c = [f(rad) for f in (math.sin, math.cos)]
+    x, y = (c*x - s*y, s*x + c*y)
+
+    return [x, y]
+
+def get_best_poly_fit(x, y, max_deg):
+    res_arr = []
+    p_arr = []
+    
+    for i in range(2, max_deg):
+        pol = numpy.polyfit(x, y, i, full=True)
+        p, res, rank, sing, rcond = pol
+        res_arr.append(res)
+        p_arr.append(p)
+
+    #print res_arr
+
+    prev_r = 1000
+    deg = 2
+    selected_deg = -1
+    
+    for item in res_arr:
+        print item
+        if item.size == 0:
+            continue
+        if item < prev_r:
+            prev_r = item
+            selected_deg = deg
+        deg = deg + 1
+
+    #print prev_r
+    print "Selected degree = ", selected_deg
+
+    print p_arr[selected_deg - 2]
+    return p_arr[selected_deg - 2]
+
+def calc_max_curvature_point(x_arr, y_arr):
+    rot_x = []
+    rot_y = []
+
+    # Rotate all of the x and y co-ordinates around the origin by 90deg
+    for current_x, current_y in zip(x_arr, y_arr):
+        out_x, out_y = rotate(current_x, current_y, 90)
+        rot_x.append(out_x)
+        rot_y.append(out_y)
+
+    pol = get_best_poly_fit(rot_x, rot_y, 7)
+
+    # Differentiate the polynomial
+    deriv_one = numpy.polyder(pol)
+    deriv_two = numpy.polyder(deriv_one)
+
+    # Roots of the 1st derivative - that is, X-values for where 1st deriv = 0
+    roots = numpy.roots(deriv_one)
+
+    if roots.size == 1:
+        result = rotate(roots, numpy.polyval(pol, roots), -90)
+    else:
+        prev_val = 0
+        selected_root = -1
+
+        for root in roots:
+            val = numpy.polyval(deriv_two, root)
+            if val > prev_val:
+                selected_root = root
+
+        result = rotate(selected_root, numpy.polyval(pol, selected_root), -90)
+
+    return [float(result[0]), float(result[1])]
+
+def snap_point_to_line(points, lines):
+    gp.toolbox = "analysis"
+
+    
+    gp.near(points, lines, "", "LOCATION")
+    # Open a Search Cursor using field name.
+    
+    rows = gp.UpdateCursor(points, "", "", "NEAR_X, NEAR_Y")
+
+    row = rows.Next()
+
+    while row:
+        new_x = row.GetValue("NEAR_X")
+        new_y = row.GetValue("NEAR_Y")
+        
+        point = gp.CreateObject("Point")
+        point.x = new_x
+        point.y = new_y
+        
+        row.shape = point
+
+        rows.UpdateRow(row)
+        row = rows.Next()
+
+def PolylineToPoint_MaxCurv(InputPolylines, OutputPoints, Folder):
+    # Get the output points filename
+    OutputPoints = os.path.split(OutputPoints)[1]
+
+    # Create the feature class to hold the points
+    gp.CreateFeatureClass_management(Folder, OutputPoints, "POINT")
+
+    # Look through the input polylines
+    rows = gp.SearchCursor(InputPolylines)
+    row = rows.Next()
+
+    while row:
+        # Get the individual points of the polyline
+        shape = row.shape
+
+        x_arr = []
+        y_arr = []
+
+        for i in range(0, shape.PartCount):
+            part = shape.getpart(i)
+            part.reset()
+            pnt = part.next()
+            while pnt:
+                x_arr.append(pnt.x)
+                y_arr.append(pnt.y)
+                print pnt.x, pnt.y
+                pnt = part.next()
+
+        out_x, out_y = calc_max_curvature_point(x_arr, y_arr)
+        
+        # Create point object
+        point = gp.CreateObject("Point")
+        
+        point.x = out_x
+        point.y = out_y
+        
+        # Store an output point from the point object created above
+        cur = gp.InsertCursor(OutputPoints)
+        new_row = cur.NewRow()
+
+        new_row.shape = point
+        cur.InsertRow(new_row)
+        
+        del new_row
+        row = rows.Next()
+    del rows
+    del row
+    del cur
+
+    snap_point_to_line(OutputPoints, InputPolylines)
+    return
+
 def process_file(full_path):
     
     full_path_no_ext = os.path.splitext(full_path)[0]
@@ -137,7 +288,8 @@ def process_file(full_path):
     gp.CopyFeatures("Polyline_lyr", SubsetFilename)
 
     print "Converting to points"
-    PolylineToPoint_Centre(SubsetFilename, PointsFilename, gp.workspace)
+    #PolylineToPoint_Centre(SubsetFilename, PointsFilename, gp.workspace)
+    PolylineToPoint_MaxCurv(SubsetFilename, PointsFilename, gp.workspace)
 
     print "Calculating Nearest Neighbour"
     
@@ -192,7 +344,7 @@ def process_file(full_path):
 
 # Get the folder from the first command-line argument
 #folder = sys.argv[1]
-folder = "D:\GIS\ConstantIterations"
+folder = "D:\GIS\TestWheelbarrow"
 
 print "Started Dune Processing"
 
