@@ -46,7 +46,7 @@ def CalculateFields(PolylineFeatures):
 
 def CalculateStatistics(inputData, FieldName):
     # Execute the Summary Statistics tool using the MEAN, SUM and COUNT options
-    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " MEAN;" + FieldName + " SUM;" + FieldName + " COUNT;" + FieldName + " MIN;" + FieldName + " MAX;")
+    gp.Statistics_analysis(inputData, "mean_tmp", FieldName + " MEAN;" + FieldName + " SUM;" + FieldName + " COUNT;" + FieldName + " MIN;" + FieldName + " MAX;" + FieldName + " STD;")
     # Get a list of fields from the new in-memory table.
     flds = gp.ListFields("mean_tmp")
     # Retrieve the field with the mean value.
@@ -82,8 +82,14 @@ def CalculateStatistics(inputData, FieldName):
             #Get the first row and mean value.
             row = rows.Next()
             minimum = row.GetValue(fld.Name)
+        elif fld.Name.__contains__("STD_"):
+            # Open a Search Cursor using field name.
+            rows = gp.SearchCursor("mean_tmp", "", "", fld.Name)
+            #Get the first row and mean value.
+            row = rows.Next()
+            std = row.GetValue(fld.Name)
         fld = flds.Next()
-    return [count, mean, total, maximum, minimum]
+    return [count, mean, total, maximum, minimum, std]
 
 def PolylineToPoint_Centre(InputPolylines, OutputPoints, Folder):
     OutputPoints = os.path.split(OutputPoints)[1]
@@ -257,6 +263,37 @@ def PolylineToPoint_MaxCurv(InputPolylines, OutputPoints, Folder):
     snap_point_to_line(OutputPoints, InputPolylines)
     return
 
+def CalculateCloseness(SubsetFilename):
+    gp.GenerateNearTable(SubsetFilename, SubsetFilename, "NearTable", "", "LOCATION", "ANGLE", "ALL")
+
+    gp.MakeTableView("NearTable", "tbl", "NEAR_DIST > 0")
+
+    #rows = gp.SearchCursor("tbl", "NEAR_ANGLE BETWEEN 175 AND 185 OR (NEAR_ANGLE BETWEEN 355 AND 360 AND NEAR_ANGLE BETWEEN 0 AND 5)", "", "")
+    
+    #rows = gp.SearchCursor("tbl", "(NEAR_ANGLE >= 175 AND NEAR_ANGLE <= 185) OR (NEAR_ANGLE >=355", "", "")
+
+    rows = gp.SearchCursor("tbl", "NEAR_ANGLE >= 175 AND NEAR_ANGLE <= 185", "", "")
+    #Get the first row and mean value.
+    row = rows.Next()
+
+    shortest = numpy.zeros(500)
+
+    while row:
+        shortest[row.IN_FID] = row.NEAR_DIST
+
+        row = rows.Next()
+
+    non_z_indices = numpy.where(shortest)
+
+    mean_closeness = numpy.mean(shortest[non_z_indices])
+    std_closeness = numpy.std(shortest[non_z_indices])
+
+    print "------------------------------"
+    print mean_closeness
+    print std_closeness
+    
+    return [mean_closeness, std_closeness]
+
 def process_file(full_path):
     
     full_path_no_ext = os.path.splitext(full_path)[0]
@@ -288,8 +325,8 @@ def process_file(full_path):
     gp.CopyFeatures("Polyline_lyr", SubsetFilename)
 
     print "Converting to points"
-    #PolylineToPoint_Centre(SubsetFilename, PointsFilename, gp.workspace)
-    PolylineToPoint_MaxCurv(SubsetFilename, PointsFilename, gp.workspace)
+    PolylineToPoint_Centre(SubsetFilename, PointsFilename, gp.workspace)
+    #PolylineToPoint_MaxCurv(SubsetFilename, PointsFilename, gp.workspace)
 
     print "Calculating Nearest Neighbour"
     
@@ -299,11 +336,17 @@ def process_file(full_path):
     # Get stats on the dune lengths and numbers
     stats = CalculateStatistics(SubsetFilename, "Length")
 
+    closeness = CalculateCloseness(SubsetFilename)
+
+    mean_closeness = closeness[0]
+    std_closeness = closeness[1]
+
     n_dunes = stats[0]
     mean_len = stats[1]
     total_len = stats[2]
     max_len = stats[3]
     min_len = stats[4]
+    stdev_len = stats[5]
 
     defect_dens = n_dunes / total_len
 
@@ -317,21 +360,10 @@ def process_file(full_path):
     csv_array = []
     tidied_file_name = re.sub("_extract", "", os.path.split(full_path_no_ext)[1])
 
-    output_stats = [tidied_file_name, n_dunes, mean_len, total_len, max_len, min_len, defect_dens, r_score, z_score, p_value]
+    output_stats = [tidied_file_name, n_dunes, mean_len, total_len, max_len, min_len, stdev_len, mean_closeness, std_closeness, defect_dens, r_score, z_score, p_value]
 
     for item in output_stats:
         csv_array.append(str(item))
-    
-    #csv_array.append(tidied_file_name)
-    #csv_array.append(str(n_dunes))
-    #csv_array.append(str(mean_len))
-    #csv_array.append(str(total_len))
-    #csv_array.append(str(max_len))
-    #csv_array.append(str(min_len))
-    #csv_array.append(str(defect_dens))
-    #csv_array.append(str(r_score))
-    #csv_array.append(str(z_score))
-    #csv_array.append(str(p_value))
 
     csv_string = ",".join(csv_array)
     return csv_string
@@ -340,11 +372,9 @@ def process_file(full_path):
 # Main Script Starts Here...
 # ----------------------------------------------------------------
 
-#folder = 'D:\GIS\RealOutputs'
-
 # Get the folder from the first command-line argument
 #folder = sys.argv[1]
-folder = "D:\GIS\TestWheelbarrow"
+folder = "D:\GIS\TestOlivia"
 
 print "Started Dune Processing"
 
@@ -358,7 +388,7 @@ print "Initialised ArcGIS object"
 output_file = os.path.join(folder, "results.csv")
 
 FILE = open(output_file, "a")
-FILE.write("name,n,mean_len,total_len,max_len,min_len,defect_dens,r_score,z_score,p_value\n")
+FILE.write("name,n,mean_len,total_len,max_len,min_len,stdev_len,mean_closeness,std_closeness,defect_dens,r_score,z_score,p_value\n")
 
 # Recursively walk though the directory tree
 for root, dirs, files in os.walk(folder):
