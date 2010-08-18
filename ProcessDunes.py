@@ -264,25 +264,31 @@ def PolylineToPoint_MaxCurv(InputPolylines, OutputPoints, Folder):
     return
 
 def CalculateCloseness(SubsetFilename):
+    # Calculate the distance from each shape (point, line, polygon) to all of the others
     gp.GenerateNearTable(SubsetFilename, SubsetFilename, "NearTable", "", "LOCATION", "ANGLE", "ALL")
 
+    # Create a view of the table so that we can run queries on it below
     gp.MakeTableView("NearTable", "tbl", "NEAR_DIST > 0")
 
-    #rows = gp.SearchCursor("tbl", "NEAR_ANGLE BETWEEN 175 AND 185 OR (NEAR_ANGLE BETWEEN 355 AND 360 AND NEAR_ANGLE BETWEEN 0 AND 5)", "", "")
-    
-    #rows = gp.SearchCursor("tbl", "(NEAR_ANGLE >= 175 AND NEAR_ANGLE <= 185) OR (NEAR_ANGLE >=355", "", "")
-
+    # Search for all of the distances which are > 175 and < 185 degrees - that is, basically horizontally
     rows = gp.SearchCursor("tbl", "NEAR_ANGLE >= 175 AND NEAR_ANGLE <= 185", "", "")
-    #Get the first row and mean value.
+    
+    # Get the first row
     row = rows.Next()
 
+    # Create a NumPy array to hold the results
     shortest = numpy.zeros(500)
 
+    # For each row
     while row:
-        shortest[row.IN_FID] = row.NEAR_DIST
+        prev_value = shortest[row.IN_FID]
+        
+        if (row.NEAR_DIST > prev_value):
+            shortest[row.IN_FID] = row.NEAR_DIST
 
         row = rows.Next()
 
+        
     non_z_indices = numpy.where(shortest)
 
     mean_closeness = numpy.mean(shortest[non_z_indices])
@@ -374,7 +380,7 @@ def process_file(full_path):
 
 # Get the folder from the first command-line argument
 #folder = sys.argv[1]
-folder = "D:\GIS\TestOlivia"
+folder = "D:\GIS\Sand2345"
 
 print "Started Dune Processing"
 
