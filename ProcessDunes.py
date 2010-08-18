@@ -281,23 +281,29 @@ def CalculateCloseness(SubsetFilename):
 
     # For each row
     while row:
+        # Get the previous shortest distance from the array
         prev_value = shortest[row.IN_FID]
         
-        if (row.NEAR_DIST > prev_value):
+        # If the previous value is 0 then this is the first distance
+        # we've found so set it to that
+        if (prev_value == 0):
+            shortest[row.IN_FID] = row.NEAR_DIST
+            continue
+        # Otherwise if this is a shorter one then use it
+        elif (row.NEAR_DIST < prev_value):
             shortest[row.IN_FID] = row.NEAR_DIST
 
+        # Move to the next row
         row = rows.Next()
 
-        
+    # Select all non-zero elements so the zero's don't skew the mean
     non_z_indices = numpy.where(shortest)
 
+    # Calculate mean and stdev
     mean_closeness = numpy.mean(shortest[non_z_indices])
     std_closeness = numpy.std(shortest[non_z_indices])
-
-    print "------------------------------"
-    print mean_closeness
-    print std_closeness
     
+    # Return results
     return [mean_closeness, std_closeness]
 
 def process_file(full_path):
