@@ -34,4 +34,7 @@ PRO READ_DECAL_FILE, input_file, output_file, r_fid
   dims = SIZE(output, /DIMENSIONS)
   
   ENVI_SETUP_HEAD, fname=output_file, ns=dims[0], nl=dims[1], nb=1, interleave=0, data_type=2, offset=0, r_fid=r_fid, /write, /open
+  
+  output = 0
+  int_array = 0
 END

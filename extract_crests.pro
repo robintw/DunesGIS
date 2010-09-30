@@ -117,6 +117,8 @@ FUNCTION EXTRACT_FROM_ASPECT, aspect_fid
   ENDFOR
   ENDFOR
   
+  image = 0
+  
   return, output
 END
 
@@ -135,9 +137,12 @@ PRO EXTRACT_CRESTS, fid, dims, pos, output_file
   envi_doit, 'conv_doit', fid=LP1_fid, dims=dims, pos=pos, kx=3, ky=3, method=3, $
     /IN_MEMORY, r_fid=LP2_fid
     
-  
+  print, "Before Extract from Aspect"
+  help, /memory
   ; Extract rough crests from aspect image
   output = EXTRACT_FROM_ASPECT(LP2_fid)
+  print, "After Extract from Aspect"
+  help, /memory
   
   ; Fill in the gaps if needed
   filled_output = FILL_IN_GAPS(output)
@@ -149,14 +154,20 @@ PRO EXTRACT_CRESTS, fid, dims, pos, output_file
   ENVI_OUTPUT_TO_EXTERNAL_FORMAT, fid=output_fid, pos=[0], dims=dims, /TIFF, out_name=output_file
   
   ; Remove all the temporary in-memory files that we created
-  ENVI_FILE_MNG, id=thresholded_fid, /REMOVE, /DELETE
-  ENVI_FILE_MNG, id=aspect_fid, /REMOVE, /DELETE
-  ENVI_FILE_MNG, id=LP1_fid, /REMOVE, /DELETE
-  ENVI_FILE_MNG, id=LP2_fid, /REMOVE, /DELETE
-  ENVI_FILE_MNG, id=output_fid, /REMOVE, /DELETE 
+  ENVI_FILE_MNG, id=thresholded_fid, /REMOVE
+  ENVI_FILE_MNG, id=aspect_fid, /REMOVE
+  ENVI_FILE_MNG, id=LP1_fid, /REMOVE
+  ENVI_FILE_MNG, id=LP2_fid, /REMOVE
+  ENVI_FILE_MNG, id=output_fid, /REMOVE 
   ENVI_FILE_MNG, id=fid, /REMOVE
   
+  filled_output = 0
+  output = 0
+  thresholded = 0
   
+  
+  print, "At end of Extract_Crests"
+  help, /memory
 END
 
 FUNCTION FILL_IN_GAPS, output
@@ -201,6 +212,17 @@ FUNCTION FILL_IN_GAPS, output
       output[indices] = 1
     ENDIF
   ENDFOR
+  
+  PTR_FREE, A
+  PTR_FREE, B
+  PTR_FREE, C
+  PTR_FREE, D
+  PTR_FREE, E
+  PTR_FREE, F
+  PTR_FREE, G
+  PTR_FREE, H
+  PTR_FREE, I
+  
   
   return, output
 END

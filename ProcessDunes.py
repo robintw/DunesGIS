@@ -385,8 +385,8 @@ def process_file(full_path):
 # ----------------------------------------------------------------
 
 # Get the folder from the first command-line argument
-#folder = sys.argv[1]
-folder = "D:\GIS\Sand2345"
+folder = sys.argv[1]
+#folder = "D:\\simulations\\batch_sims_unzipped\\RTW\\rtw363"
 
 print "Started Dune Processing"
 
@@ -422,3 +422,4 @@ end = time.clock()
 
 print "-------------"
 print "Analsis took " + str(end-start) + " seconds"
+
